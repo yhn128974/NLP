@@ -5,6 +5,8 @@ import torch.nn as nn
 from torch.utils.data import Dataset,DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import os
+
 
 # 1- 设置变量
 # 运行设备
@@ -13,6 +15,7 @@ device = ("cuda" if torch.cuda.is_available() else "cpu")   # Windows的写法
 
 # 数据文件路径
 data_path = "../data/eng-fra-v2.txt"
+data_path = os.path.join(os.path.dirname(__file__),data_path)
 
 # 句子开始标识
 SOS_TOKEN = 0
@@ -130,7 +133,7 @@ def get_dataloader():
 
     return dataloader
 
-# 6- 无注意力机制的编码器
+# 6- 无注意力机制的编码器（核心机制1）
 class Encoder(nn.Module):
     def __init__(self,eng_vocab_size,input_size,hidden_size):
         """
@@ -200,7 +203,7 @@ def use_encoder():
 
         break
 
-# 7- 解码器：无注意力机制
+# 7- 解码器：无注意力机制(核心机制2)
 class Decoder(nn.Module):
     def __init__(self,fra_vocab_size,hidden_size):
         # 1- 初始化父类
@@ -285,7 +288,7 @@ def use_decoder():
 
         break
 
-# 8- 解码器：有注意力机制
+# 8- 解码器：有注意力机制（核心机制2）
 class AttenDecoder(nn.Module):
     def __init__(self,fra_vocab_size,hidden_size):
         # 1- 初始化父类
@@ -596,11 +599,12 @@ def use_seq2seq_evaluate():
 if __name__ == '__main__':
     # 1- 数据清洗测试
     # content = " I LOve h@@@eima! "
-    # normalizeString(content)
+    # res= normalizeString(content)
+    # print(res)
 
     # 2- 读取文件
     # getdata()
-
+    # english_word2index,english_word_cnt,franch_word2index,franch_word_cnt,eng_fra_pairs,franch_index2word = getdata()
     # print(english_word_cnt)
     # print(franch_word_cnt)
     # print(eng_fra_pairs[:5])
@@ -612,20 +616,20 @@ if __name__ == '__main__':
     # for x,y in dataloader:
     #     print(x)
     #     print(y)
-    #
     #     break
 
     # 4- 测试编码器
     # use_encoder()
 
+    # 测试解码器use_decoder()
     # use_decoder()
 
 
     # 5- 模型训练
-    train()
+    # train()
 
     # 6- 模型预测
-    use_seq2seq_evaluate()
+    # use_seq2seq_evaluate()
 
 
 

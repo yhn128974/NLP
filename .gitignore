@@ -1,3 +1,20 @@
+# 忽略的资料目录
 阶段7 NLP自然处理语言基础 资料/
+
+# 训练产物 / 本地模型
+**/model/
+**/runs/
+**/logs/
 *.mp4
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+
+# 数据集缓存目录
 **/data/gz03ag
+
+# IDE 配置
+.idea/
