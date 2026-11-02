@@ -6,12 +6,10 @@ from torch import Tensor
 class MyAtten(nn.Module):
     def __init__(self,query_size,key_size,c_size,output_size):
         """
-        
         :param query_size: 张量Q最后一个维度的形状，目前这里就是8
         :param key_size: 张量K最后一个维度的形状，目前这里就是8
         :param c_size: 张量C最后一个维度的形状，目前这里就是8
         :param output_size: Q和C拼接后，并且经过线性调整形状后的张量中最后一个维度的形状，目前这里就是8
-
         """
 
         # 1- 初始化父类
@@ -32,51 +30,91 @@ class MyAtten(nn.Module):
         self.qc_linear = nn.Linear(in_features=self.query_size+self.c_size,out_features=self.output_size)
         # self.qc_linear = nn.Linear(in_features=16,out_features=8)
 
-    def forward(self,Q:Tensor,K,V):
+
+
+    # def forward(self,Q:Tensor,K,V):
+    #     """
+    #     目前暂时不研究QKV如何来的。只计算数据准备好后的注意力的计算过程。对应原理图中中间的绿色框
+    #     :param Q: query，张量形状[batch_size,num_layers,hidden_size] -> [2,1,8]
+    #     :param K: key，张量形状[batch_size,seq_len,hidden_size] -> [2,5,8]
+    #     :param V: value，与key完全一致，张量形状[batch_size,seq_len,hidden_size] -> [2,5,8]
+    #     :return:
+    #     """
+    #     # 1- Q和K拼接
+    #     # 1.1- Q和K目前不能直接拼接，需要将Q的形状 由 [2,1,8] -> [2,5,8]
+    #     seq_len = K.shape[1]
+    #     # expand：扩大张量的形状。-1表示调整前后对应位置的形状不变
+    #     Q_expand = Q.expand(size=(-1,seq_len,-1))
+    #     print(f"1-->{Q.shape}") # [2,1,8]
+    #     print(f"2-->{Q_expand.shape}") # [2,5,8]
+
+    #     # 1.2- 拼接：Q_expand [2,5,8] K [2,5,8] -> [2,5,16]
+    #     qk_cat = torch.cat(tensors=(Q_expand,K), dim=-1)
+    #     print(f"3-->{qk_cat.shape}") # [2,5,16]
+
+    #     # 2- 使用线性层对QK拼接后的结果计算相似性
+    #     score = self.score_linear(qk_cat)
+    #     print(f"4-->{score.shape}") # [2,5,1]
+
+    #     # 3- 将相似性转成权重矩阵
+    #     # 3.1- 调整score的形状：由[2,5,1] -> [2,1,5]
+    #     score = score.transpose(dim0=1,dim1=2)
+    #     print(f"5-->{score.shape}") # [2,1,5]
+
+    #     # 3.2- 调用Softmax
+    #     weighted_mat = torch.softmax(score, dim=-1)
+    #     print(f"6-->{weighted_mat.shape}") # [2,1,5]
+
+    #     # 4- 加权求和：权重矩阵和V进行矩阵乘法。计算得到专属信息包
+    #     # weighted_mat [2,1,5]；V [2,5,8] -> [2,1,8]
+    #     C = torch.bmm(weighted_mat, V)
+    #     print(f"7-->{C.shape}") # [2,1,8]
+
+    #     # 5- Q和C拼接：Q [2,1,8]；C [2,1,8] -> [2,1,16]
+    #     qc_cat = torch.cat(tensors=(Q,C), dim=-1)
+    #     print(f"8-->{qc_cat.shape}") # [2,1,16]
+
+    #     # 6- 对拼接后的张量进行形状调整，以满足Decoder端GRU输入数据的要求
+    #     result = self.qc_linear(qc_cat)
+    #     print(f"9-->{result.shape}") # [2,1,8]
+
+    #     return result,weighted_mat
+
+
+    def forward(self,Q:Tensor,K:Tensor,V:Tensor):
         """
-        目前暂时不研究QKV如何来的。只计算数据准备好后的注意力的计算过程。对应原理图中中间的绿色框
-        :param Q: query，张量形状[batch_size,num_layers,hidden_size] -> [2,1,8]
-        :param K: key，张量形状[batch_size,seq_len,hidden_size] -> [2,5,8]
-        :param V: value，与key完全一致，张量形状[batch_size,seq_len,hidden_size] -> [2,5,8]
-        :return:
+        参数介绍:
+        Q:query:【batch_size,seq_len,hidden_size]
+        k:key:【batch_size,seq_len,hidden_size]
+        V:value:【batch_size,seq_len,hidden_size]
         """
-        # 1- Q和K拼接
-        # 1.1- Q和K目前不能直接拼接，需要将Q的形状 由 [2,1,8] -> [2,5,8]
-        seq_len = K.shape[1]
-        # expand：扩大张量的形状。-1表示调整前后对应位置的形状不变
-        Q_expand = Q.expand(size=(-1,seq_len,-1))
-        print(f"1-->{Q.shape}") # [2,1,8]
-        print(f"2-->{Q_expand.shape}") # [2,5,8]
 
-        # 1.2- 拼接：Q_expand [2,5,8] K [2,5,8] -> [2,5,16]
-        qk_cat = torch.cat(tensors=(Q_expand,K), dim=-1)
-        print(f"3-->{qk_cat.shape}") # [2,5,16]
+        # 1- Q和K拼接。使用torch.cat进行拼接
+        sq_len=K.shape[1]
+        Q_expand=Q.expand(size=(-1,sq_len,-1)) #-1是保持不变
 
-        # 2- 使用线性层对QK拼接后的结果计算相似性
-        score = self.score_linear(qk_cat)
-        print(f"4-->{score.shape}") # [2,5,1]
+        # 1.1- 拼接：Q_expand [2,5,8] K [2,5,8] -> [2,5,16]
+        qk_cat=torch.cat(tensors=(Q_expand,K),dim=-1) #dim=-1是按照最后一个维度进行拼接
 
-        # 3- 将相似性转成权重矩阵
-        # 3.1- 调整score的形状：由[2,5,1] -> [2,1,5]
-        score = score.transpose(dim0=1,dim1=2)
-        print(f"5-->{score.shape}") # [2,1,5]
+        # 2- 使用线性层对QK拼接后的结果计算相似性。使用nn.Linear进行线性计算
+        score=self.score_linear(qk_cat) # [2,5,1]
 
-        # 3.2- 调用Softmax
-        weighted_mat = torch.softmax(score, dim=-1)
-        print(f"6-->{weighted_mat.shape}") # [2,1,5]
+        # 3- 将相似性转成权重矩阵。使用torch.softmax进行转成权重矩阵
+        #transpose接收两个参数，表示要交换的两个维度。
+        # 3.1 改变矩阵形状
+        score=score.transpose(1,2) # [2,1,5]
+        # 3.2 调用Softmax :得到权重矩阵
+        weighted_mat=torch.softmax(score,dim=-1) # [2,1,5]
 
-        # 4- 加权求和：权重矩阵和V进行矩阵乘法。计算得到专属信息包
-        # weighted_mat [2,1,5]；V [2,5,8] -> [2,1,8]
-        C = torch.bmm(weighted_mat, V)
-        print(f"7-->{C.shape}") # [2,1,8]
+        # 4- 加权求和将权重矩阵和V进行矩阵乘法。计算得到专属信息包C。使用torch.bmm进行矩阵乘法
+        C=torch.bmm(weighted_mat,V) # [2,1,8]
 
-        # 5- Q和C拼接：Q [2,1,8]；C [2,1,8] -> [2,1,16]
-        qc_cat = torch.cat(tensors=(Q,C), dim=-1)
-        print(f"8-->{qc_cat.shape}") # [2,1,16]
+        # 5- Q和C拼接：Q [2,1,8]；C [2,1,8] -> [2,1,16]。使用torch.cat进行拼接
+        qc_cat= torch.cat(tensors=(Q,C),dim=-1) # [2,1,16]
 
-        # 6- 对拼接后的张量进行形状调整，以满足Decoder端GRU输入数据的要求
-        result = self.qc_linear(qc_cat)
-        print(f"9-->{result.shape}") # [2,1,8]
+        # 6- 对拼接后的张量使用NN.LINEAR进行形状调整，以满足Decoder端GRU输入数据的要求。result [2,1,8]
+        result=self.qc_linear(qc_cat) # [2,1,8]
+        # 7- 返回结果。result [2,1,8]，attn_weight [2,1,5]
 
         return result,weighted_mat
 
