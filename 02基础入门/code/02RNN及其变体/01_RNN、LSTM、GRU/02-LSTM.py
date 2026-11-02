@@ -7,7 +7,7 @@ if __name__ == '__main__':
         参数解释：
             bidirectional：是否是双向的网络结构。默认是False，也就是单向的。如果设置为True，LSTM就变成Bi-LSTM
     """
-    lstm = nn.LSTM(input_size=4,hidden_size=5,num_layers=1,bidirectional=False)
+    lstm=nn.LSTM(input_size=4,hidden_size=5,num_layers=1,bidirectional=False)
 
     # 2- 准备数据
     # input的形状：[seq_len句子中词的个数,batch_size每个批次句子的个数,input_size词向量的维度]
@@ -19,7 +19,10 @@ if __name__ == '__main__':
         因此：隐藏状态 和 细胞状态 的张量形状是相同的
         实际工作中，一般对隐藏状态 和 细胞状态全都使用全0初始化
     """
+    # 隐藏状态
+    # 第一个参数是 隐藏层的层数（神经元个数） * 方向数
     h0 = torch.zeros(size=(1,3,5))
+    # 细胞状态
     c0 = torch.zeros(size=(1,3,5))
 
     # 3- 调用LSTM
@@ -29,11 +32,12 @@ if __name__ == '__main__':
     """
 
     # 注意：传递和接受结果，都需要将隐藏状态 和 细胞状态用元组包起来
+    # output,(hidden,c1)顺序不能变
     output,(hidden,c1) = lstm(input,(h0,c0))
 
     print(f"output形状-->{output.shape}") # 6,3,5
     print(f"hidden形状-->{hidden.shape}")
-    print(f"c1形状-->{c1.shape}") # 1,3,5
+    print(f"c1形状-->{c1.shape}") # 1,3,5 
 
     print(f"output-->{output}")
     print(f"hidden-->{hidden}")

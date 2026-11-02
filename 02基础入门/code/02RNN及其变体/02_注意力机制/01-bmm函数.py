@@ -14,13 +14,14 @@ import torch
 if __name__ == '__main__':
     # 准备数据
     mat_1 = torch.randint(low=1,high=5,size=(10,3,4))
-    # mat_1 = torch.randint(low=1,high=5,size=(1,3,4))
+
+    # mat_1 = torch.randint(low=1,high=5,size=(1,3,4)) #不可以用与BMM
     mat_2 = torch.randint(low=1,high=5,size=(10,4,5))
 
     # matmul
     matmul_result = mat_1 @ mat_2
     print("matmul_result：",matmul_result.shape)
 
-    # bmm
+    # bmm 
     bmm_result = torch.bmm(mat_1,mat_2)
     print("bmm_result：", bmm_result.shape)

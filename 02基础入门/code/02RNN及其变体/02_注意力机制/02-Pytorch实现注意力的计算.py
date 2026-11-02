@@ -6,10 +6,12 @@ from torch import Tensor
 class MyAtten(nn.Module):
     def __init__(self,query_size,key_size,c_size,output_size):
         """
+        
         :param query_size: 张量Q最后一个维度的形状，目前这里就是8
         :param key_size: 张量K最后一个维度的形状，目前这里就是8
         :param c_size: 张量C最后一个维度的形状，目前这里就是8
         :param output_size: Q和C拼接后，并且经过线性调整形状后的张量中最后一个维度的形状，目前这里就是8
+
         """
 
         # 1- 初始化父类
