@@ -1,4 +1,6 @@
 {
   "python.defaultInterpreterPath": "C:\\Users\\YuEth\\anaconda3\\envs\\dl_project\\python.exe",
-  "python.terminal.activateEnvironment": true
+  "python.terminal.activateEnvironment": true,
+  "cursor.cmdk.useThemedDiffBackground2": false,
+  "workbench.preferredDarkColorTheme": "Default Light Modern"
 }

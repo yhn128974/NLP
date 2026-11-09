@@ -14,8 +14,17 @@ device = ("cuda" if torch.cuda.is_available() else "cpu")   # Windows的写法
 # device = "mps"  # Mac的写法
 
 # 数据文件路径
-data_path = "../data/eng-fra-v2.txt"
+data_path = "../data/eng-fra-v2.txt"  
 data_path = os.path.join(os.path.dirname(__file__),data_path)
+
+# 1. 获取当前脚本所在的绝对目录（不管你在哪个终端、哪个目录下启动，它永远正确）
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# 2. 拼接出 model 文件夹的绝对路径，并自动创建文件夹（防止报错）
+model_dir = os.path.join(BASE_DIR, "../model")
+os.makedirs(model_dir, exist_ok=True)
+# 3. 拼接出模型的完整安全路径
+encoder_path = os.path.join(model_dir, "encoder.pkl")
+decoder_path = os.path.join(model_dir, "decoder.pkl")
 
 # 句子开始标识
 SOS_TOKEN = 0
@@ -51,14 +60,14 @@ def getdata():
     eng_fra_pairs = []
     for eng_fra_line in eng_fra_list:
 
-        tmp_list = []
+        tmp_list = []  
         for line in eng_fra_line.split("\t"):
             tmp_list.append(normalizeString(line))
 
         eng_fra_pairs.append(tmp_list)
 
-    # 3- 分别得到英语词汇表和法语词汇表
-    english_word2index = {"SOS":SOS_TOKEN,"EOS":EOS_TOKEN}
+    # 3- 分别得到英语词汇表和法语词汇表：初始化字典，key是单词，value是索引，"SOS":SOS_TOKEN,"EOS":EOS_TOKEN是特殊词的索引
+    english_word2index = {"SOS":SOS_TOKEN,"EOS":EOS_TOKEN} 
     english_word_cnt = 2
 
     franch_word2index = {"SOS":SOS_TOKEN,"EOS":EOS_TOKEN}
@@ -82,6 +91,7 @@ def getdata():
 
     return english_word2index,english_word_cnt,franch_word2index,franch_word_cnt,eng_fra_pairs,franch_index2word
 
+# 全局变量
 english_word2index,english_word_cnt,franch_word2index,franch_word_cnt,eng_fra_pairs,franch_index2word = getdata()
 
 # 4- 自定义Dataset
@@ -90,10 +100,11 @@ class MyPairsDataset(Dataset):
         self.eng_fra_pairs = eng_fra_pairs
         self.sample_cnt = len(eng_fra_pairs)    # 样本条数
 
+    # __len__:函数是计算样本条数
     def __len__(self):
         return self.sample_cnt
 
-    def __getitem__(self, index):
+    def __getitem__(self, index): 
         # 1- 防止索引为负数；防止索引越界
         index = min(max(index,0), self.sample_cnt - 1)
 
@@ -111,13 +122,16 @@ class MyPairsDataset(Dataset):
         """
         # 2.2- 处理英语句子
         x = [english_word2index[word] for word in eng_fra_pair[0].split(" ")]
+        
         # 所有的张量数据必须放在同一个硬件设备上，要么同时在GPU，要么同时在CPU
         x_tensor = torch.tensor(x,dtype=torch.long,device=device)
         # print(f"原始英语句子{eng_fra_pair[0]}，词索引向量{x_tensor}")
 
         # 2.3- 处理法语句子
         y = [franch_word2index[word] for word in eng_fra_pair[1].split(" ")]
-        y.append(EOS_TOKEN)
+
+        y.append(EOS_TOKEN) #目的是告诉解码器翻译工作完成 
+
         y_tensor = torch.tensor(y, dtype=torch.long, device=device)
         # print(f"原始法语句子{eng_fra_pair[1]}，词索引向量{y_tensor}")
 
@@ -129,11 +143,12 @@ def get_dataloader():
     dataset = MyPairsDataset(eng_fra_pairs)
 
     # 2- 创建数据加载器
+    # 注意，这里没有做句子长度规范，因此送入到编码器中句子的长度不等长，所以batch_size的值只能是1
     dataloader = DataLoader(dataset=dataset,batch_size=1,shuffle=True)
 
     return dataloader
 
-# 6- 无注意力机制的编码器（核心机制1）
+# 6- 无注意力机制的编码器 
 class Encoder(nn.Module):
     def __init__(self,eng_vocab_size,input_size,hidden_size):
         """
@@ -179,7 +194,7 @@ class Encoder(nn.Module):
         # 隐藏状态张量形状：[num_layers,batch_size,hidden_size]
         # num_layers：目前手动指定为1层
         # batch_size：因为我们没有对英语句子进行长度规范的处理，因此只能设置为1
-        return torch.zeros(size=(1,1,self.hidden_size)).to(device=device)
+        return torch.zeros(size=(1,1,self.hidden_size)).to(device=device)  
 
 # 测试编码器
 def use_encoder():
@@ -203,8 +218,8 @@ def use_encoder():
 
         break
 
-# 7- 解码器：无注意力机制(核心机制2)
-class Decoder(nn.Module):
+# 7- 解码器：无注意力机制
+class Decoder(nn.Module): 
     def __init__(self,fra_vocab_size,hidden_size):
         # 1- 初始化父类
         super().__init__()
@@ -227,7 +242,7 @@ class Decoder(nn.Module):
         # CrossEntropyLoss = LogSoftmax + NLLLoss
         self.log_softmax = nn.LogSoftmax(dim=-1)
 
-    def forward(self,input,hidden):
+    def forward(self,input,hidden):  
         """
         Decoder前向传播：负责翻译得到法语词
         :param input: 本次输入数据，每次只送一个法语词进来，张量形状：[batch_size,seq_len]，[[一个法语词的词索引]]
@@ -249,9 +264,11 @@ class Decoder(nn.Module):
             output[:,0,:]  针对文本翻译的业务场景。
         """
         output = output[:,0,:]
-        print(f"2-->output[:,0,:]-->{output.shape}")
+        
+        print(f"2-->output[:,0,:]-->{output.shape}") #跟之前完全一样
 
         # 3.2- 调用
+
         output = self.log_softmax(self.output_linear(output))
         print(f"3-->output-->{output.shape}")
 
@@ -288,7 +305,7 @@ def use_decoder():
 
         break
 
-# 8- 解码器：有注意力机制（核心机制2）
+# 8- 解码器：有注意力机制
 class AttenDecoder(nn.Module):
     def __init__(self,fra_vocab_size,hidden_size):
         # 1- 初始化父类
@@ -326,7 +343,7 @@ class AttenDecoder(nn.Module):
         :param prev_hidden: 解码器上一个时间步的隐藏状态，也就是K。张量形状 [num_layers,batch_size,hidden_size]
         :param encoder_outputs: 编码器端所有时间步隐藏状态的拼接，也就是V，而且还做了句子长度规范的处理。张量形状 [batch_size,MAX_LENGTH,hidden_size]
         :return:
-        """
+        """ 
 
         # 1- 调用词嵌入层
         embedded = self.dropout(self.embedding(input))
@@ -379,11 +396,11 @@ def train_iter(x,y,my_encoder,my_decoder,encoder_adam,decoder_adam,loss):
     :param my_decoder: 解码器对象
     :param encoder_adam: 编码器的优化器
     :param decoder_adam: 解码器的优化器
-    :param loss: 损失函数对象
+    :param loss: 损失函数对象 
     :return: 平均损失值
     """
 
-    # 1- 调用编码器
+    # 1- 调用编码器 
     encoder_hidden = my_encoder.init_hidden()
     encoder_output,encoder_hidden = my_encoder(x,encoder_hidden)
 
@@ -459,6 +476,46 @@ def train_iter(x,y,my_encoder,my_decoder,encoder_adam,decoder_adam,loss):
 
     return loss_value.item() / y_seq_len
 
+# 翻译句子的工作流程
+def train_iter_test(x_train,y_train,encoder,decoder,encoder_optimer,decoder_optimer,loss):
+    
+    # 1.调用编码器
+    encoder_hidden= encoder.init_hidden()
+    encoder_output,encoder_hidden=encoder(x_train,encoder_hidden)
+
+    # 中间衔接步骤
+    # (1)对encoder_output进行句子长度规范
+    V=torch.zeros(size=(1,MAX_LENGTH,256),device=device)
+    eng_seq_len=x_train.shape[1]
+    use_seq_len=min(eng_seq_len.MAX_LENGTH)
+    V[:,:use_seq_len,:]=encoder_output[:,:use_seq_len,:]
+    # (2)准备变量
+    loss_value=0.0
+    #  解码器的初始隐藏状态是解码器的最后一个时间步的隐藏状态
+    decoder_hidden=encoder_hidden
+    # 法语中句子的个数
+    fra_seq_len=y_train.shape[1]
+    # 存储法语翻译结果，第一个词表示翻译工作的开始，也就是在存放sos_token
+    input_y=torch.tensor(data=[[SOS_TOKEN]],device=device)
+
+    """
+    教师机制，称之为teacher_forcing
+    1.只能使用在训练阶段，不要再预测阶段
+    2.再训练阶段也不能每次都告诉模型真实值，提高模型的泛化能力
+
+    """
+    teacher_forcing_flag= True if random.random()<0.5 else False
+    # 2.调用解码器
+
+
+    # 3.反向传播固定代码
+
+    # 3.1.梯度清零
+    # 3.2.反向传播
+    # 3.3.更新权重参数
+
+    # 4.返回损失
+    pass
 # 9.2- 整体训练过程
 def train():
     # 1- 准备数据
@@ -468,9 +525,11 @@ def train():
     # 2.1- 模型实例对象
     my_encoder = Encoder(eng_vocab_size=english_word_cnt,input_size=256,hidden_size=256).to(device=device)
     my_decoder = AttenDecoder(fra_vocab_size=franch_word_cnt,hidden_size=256).to(device=device)
+
     # 2.2- 优化器实例对象：与具体的实例对象有关，因此要创建单独的两个
     encoder_adam = torch.optim.Adam(params=my_encoder.parameters(),lr=1e-4)
     decoder_adam = torch.optim.Adam(params=my_decoder.parameters(),lr=1e-4)
+
     # 2.3- 损失函数对象：与具体的实例对象无关，内部只是通过预测和真实值计算差值而已，因此只需要创建一个
     loss = nn.NLLLoss()
 
@@ -502,12 +561,58 @@ def train():
                 print(f"第{epoch+1}轮次，平均损失{avg_loss}")
 
     # 5- 保存训练好的模型
-    torch.save(my_encoder.state_dict(), "model/encoder.pkl")
-    torch.save(my_decoder.state_dict(), "model/decoder.pkl")
+    os.makedirs("model", exist_ok=True)
+   # 4. 保存模型
+    torch.save(my_encoder.state_dict(), encoder_path)
+    torch.save(my_decoder.state_dict(), decoder_path)
 
     # 6- 绘制损失值变化曲线
     plt.plot(avg_loss_list)
     plt.show()
+
+# 训练过程手写
+def test_train():
+    # 1.加载模型
+    dataLoader=get_dataloader()
+    # 2.创建模型实例对象
+    encoder=Encoder(eng_vocab_size=english_word_cnt,input_size=256,hidden_size=256).to(device=device)
+    decoder=Decoder(fra_vocab_size=franch_word_cnt, hidden_size=256).to(device=device)
+    # 3.创建优化器对象
+    encoder_optimer=torch.optim.Adam(params=encoder.parameters(),lr=1e-4)
+    decoder_optimer=torch.optim.Adam(params=decoder.parameters(),lr=1e-4)
+    # 4.创建损失函数对象
+    loss=nn.NLLLoss()
+    # 5.设置模型
+    encoder.train()
+    decoder.train()
+    # 6.训练
+    epochs=1
+    # 记录平均损失
+
+    avg_loss_list=[]
+    for epoch in range(epochs):
+        total_loss_value=0.0
+        for index,(x_train,y_train) in enumerate(tqdm(dataLoader),start=1):
+            # 单条数据训练
+            loss_value=train_iter(x_train,y_train,encoder,decoder,encoder_optimer,decoder_optimer,loss)
+
+            # 更新损失值
+            total_loss_value+=loss_value
+            # 每隔100个批次记录一次平均损失信息
+            if index%100==0:
+                # 计算平均损失
+                avg_loss= total_loss_value/index
+                avg_loss_list.append(avg_loss)
+                print(f'第{epoch+1}次的平均损失是{avg_loss}')
+     
+    # 7.保存训练好的模型
+    torch.save(encoder,encoder_path)
+    torch.save(decoder,decoder_path)
+
+    # 8.绘制损失变化曲
+    plt.plot(avg_loss_list)
+    plt.show()
+
 
 # 10- 模型预测
 # 10.1- 单条句子的翻译
@@ -571,10 +676,10 @@ def use_seq2seq_evaluate():
 
     # 2- 加载训练好的模型
     my_encoder = Encoder(eng_vocab_size=english_word_cnt,input_size=256,hidden_size=256).to(device=device)
-    my_encoder.load_state_dict(torch.load("model/encoder.pkl"))
+    my_encoder.load_state_dict(torch.load(encoder_path))
 
     my_decoder = AttenDecoder(fra_vocab_size=franch_word_cnt,hidden_size=256).to(device=device)
-    my_decoder.load_state_dict(torch.load("model/decoder.pkl"))
+    my_decoder.load_state_dict(torch.load(decoder_path))
 
     # 3- 设置模式
     my_encoder.eval()
@@ -626,7 +731,7 @@ if __name__ == '__main__':
 
 
     # 5- 模型训练
-    # train()
+    train()
 
     # 6- 模型预测
     # use_seq2seq_evaluate()
