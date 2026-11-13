@@ -17,6 +17,8 @@ device = ("cuda" if torch.cuda.is_available() else "cpu")   # Windows的写法
 data_path = "../data/eng-fra-v2.txt"  
 data_path = os.path.join(os.path.dirname(__file__),data_path)
 
+# current_path=os.path.join(os.path.dirname(__file__),'...')
+
 # 1. 获取当前脚本所在的绝对目录（不管你在哪个终端、哪个目录下启动，它永远正确）
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 2. 拼接出 model 文件夹的绝对路径，并自动创建文件夹（防止报错）
@@ -305,7 +307,7 @@ def use_decoder():
 
         break
 
-# 8- 解码器：有注意力机制
+# 8- 解码器：有注意力机制(重点掌握)
 class AttenDecoder(nn.Module):
     def __init__(self,fra_vocab_size,hidden_size):
         # 1- 初始化父类
@@ -386,7 +388,7 @@ class AttenDecoder(nn.Module):
         return torch.zeros(size=(1,1,self.hidden_size)).to(device=device)
 
 # 9- 模型训练
-# 9.1- 单次训练过程
+# 9.1- 单次训练过程(重点掌握)
 def train_iter(x,y,my_encoder,my_decoder,encoder_adam,decoder_adam,loss):
     """
     单次样本数据的训练过程
@@ -478,7 +480,7 @@ def train_iter(x,y,my_encoder,my_decoder,encoder_adam,decoder_adam,loss):
 
 # 翻译句子的工作流程
 def train_iter_test(x_train,y_train,encoder,decoder,encoder_optimer,decoder_optimer,loss):
-    
+
     # 1.调用编码器
     encoder_hidden= encoder.init_hidden()
     encoder_output,encoder_hidden=encoder(x_train,encoder_hidden)
@@ -488,13 +490,18 @@ def train_iter_test(x_train,y_train,encoder,decoder,encoder_optimer,decoder_opti
     V=torch.zeros(size=(1,MAX_LENGTH,256),device=device)
     eng_seq_len=x_train.shape[1]
     use_seq_len=min(eng_seq_len.MAX_LENGTH)
+
     V[:,:use_seq_len,:]=encoder_output[:,:use_seq_len,:]
+
     # (2)准备变量
     loss_value=0.0
+
     #  解码器的初始隐藏状态是解码器的最后一个时间步的隐藏状态
     decoder_hidden=encoder_hidden
+
     # 法语中句子的个数
     fra_seq_len=y_train.shape[1]
+
     # 存储法语翻译结果，第一个词表示翻译工作的开始，也就是在存放sos_token
     input_y=torch.tensor(data=[[SOS_TOKEN]],device=device)
 
@@ -506,16 +513,70 @@ def train_iter_test(x_train,y_train,encoder,decoder,encoder_optimer,decoder_opti
     """
     teacher_forcing_flag= True if random.random()<0.5 else False
     # 2.调用解码器
+    if teacher_forcing_flag:
+        # 调用教师机制
+        for index in range(fra_seq_len):
+            # 前向传播
+            pred_output,decoder_hidden,attn_weights=decoder(input=input_y, prev_hidden=decoder_hidden, encoder_outputs=V)
 
+            # 计算损失
+            # 预测值
+            # pred_output的形状由三维变为2维
+            pred_output=pred_output.reshape(1,-1)
+            # 真实值
+
+            y_true=y_train[0][i].reshape(1)
+            # pred_output为2为，y_true为一维计算损失
+            loss_value+=loss(pred_output,y_true)
+            # 告诉下一步真实法语词汇
+            input_y=y_train[0][i].reshape(1,-1)
+    else:
+        # 普通机制
+
+        for index in range(fra_seq_len):
+            # 前向传播
+            pred_output,decoder_hidden,attn_weights=decoder(input=input_y, prev_hidden=decoder_hidden, encoder_outputs=V)
+
+            # 计算损失
+            # 预测值
+            # pred_output的形状由三维变为2维
+            pred_output=pred_output.reshape(1,-1)
+
+            # 真实值
+            y_true=y_train[0][i].reshape(1)
+
+            # pred_output为2为，y_true为一维计算损失
+            loss_value+=loss(pred_output,y_true)
+
+            # 告诉下一步预测的法语词汇, 得出所有法语中概率最大的那个词
+            pred_word_index=torch.argmax(pred_output,dim=-1)
+
+            # 如果遇到了EOS_TOKEN结束表示或者遍历完所有的词之后翻译工作结束s
+            if pred_word_index==EOS_TOKEN:
+                break
+
+            input_y=pred_word_index.reshape(1,-1)
+        pass
 
     # 3.反向传播固定代码
 
     # 3.1.梯度清零
+    encoder.zero_grad()
+    decoder.zero_grad()
+
     # 3.2.反向传播
+    loss_value.sum().backward()
+
     # 3.3.更新权重参数
+    encoder_optimer.step()
+    decoder_optimer.step()
+
 
     # 4.返回损失
-    pass
+    return loss_value.item()/fra_seq_len
+
+ 
+
 # 9.2- 整体训练过程
 def train():
     # 1- 准备数据
@@ -625,6 +686,7 @@ def seq2seq_evaluate(x_tensor,my_encoder,my_decoder):
     :return: 翻译的法语词列表
     """
 
+    # 禁止模型进行反向传播更新权重
     with torch.no_grad():
         # 1- 调用编码器
         encoder_output,encoder_hidden = my_encoder(x_tensor,my_encoder.init_hidden())
@@ -664,6 +726,7 @@ def seq2seq_evaluate(x_tensor,my_encoder,my_decoder):
             input_y = torch.tensor([[pred_fra_index]], device=device)
 
     return franch_word_list
+
 
 # 10.2- 完整的预测流程
 def use_seq2seq_evaluate():
@@ -731,10 +794,10 @@ if __name__ == '__main__':
 
 
     # 5- 模型训练
-    train()
+    # train()
 
     # 6- 模型预测
-    # use_seq2seq_evaluate()
+    use_seq2seq_evaluate()
 
 
 
