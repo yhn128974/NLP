@@ -131,8 +131,8 @@ def use_positional_encoding():
 
     # 调用位置编码，最终效果是往词向量中加上了位置编码的值
     result = my_pe(word_embed)
-    print(f"最终的形状：{result.shape}")
-    print(f"最终的值：{result}")
+    # print(f"最终的形状：{result.shape}")
+    # print(f"最终的值：{result}")
 
     return result
 
@@ -158,8 +158,11 @@ def plot_position():
     plt.legend([f'dim {p}' for p in [4, 5, 6, 7]])
     plt.show()
 
+
 if __name__ == '__main__':
+
     # use_embedding()
     use_positional_encoding()
 
     # plot_position()
+
